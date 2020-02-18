@@ -18,11 +18,7 @@ void setup() {
 	Serial.println();
 	Serial.println();
 
-	for (uint8_t t = 4; t > 0; t--) {
-		Serial.printf("[SETUP] WAIT %d...\n", t);
-		Serial.flush();
-		delay(1000);
-	}
+	delay(1000);
 
 	WiFi.mode(WIFI_STA);
 	WiFiMulti.addAP("Protospace", "yycmakers");
@@ -59,6 +55,10 @@ void loop() {
 						String payload = https.getString();
 						Serial.println(payload);
 					}
+
+					Serial.println("Sent, sleeping 60s");
+					ESP.deepSleep(60 * 1000000);
+					delay(100);
 				} else {
 					Serial.printf("[HTTPS] POST... failed, error: %s\n", https.errorToString(httpCode).c_str());
 				}
@@ -73,6 +73,6 @@ void loop() {
 		}
 	}
 
-	Serial.println("Wait 60s before next round...");
-	delay(60000);
+	Serial.println("Error, wait 10s before trying again...");
+	delay(10000);
 }
