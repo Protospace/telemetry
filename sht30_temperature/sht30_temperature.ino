@@ -37,16 +37,16 @@ void loop() {
 		HTTPClient https;
 
 		Serial.print("[HTTPS] begin...\n");
-		if (https.begin(*client, "https://jigsaw.w3.org/HTTP/connection.html")) {  // HTTPS
-
-			Serial.print("[HTTPS] GET...\n");
+		if (https.begin(*client, "https://api.my.protospace.ca/stats/bay_108_temp/")) {
+			Serial.print("[HTTPS] POST...\n");
 			// start connection and send HTTP header
-			int httpCode = https.GET();
+			https.addHeader("Content-Type", "application/x-www-form-urlencoded");
+			int httpCode = https.POST("data=1234");
 
 			// httpCode will be negative on error
 			if (httpCode > 0) {
 				// HTTP header has been send and Server response header has been handled
-				Serial.printf("[HTTPS] GET... code: %d\n", httpCode);
+				Serial.printf("[HTTPS] POST... code: %d\n", httpCode);
 
 				// file found at server
 				if (httpCode == HTTP_CODE_OK || httpCode == HTTP_CODE_MOVED_PERMANENTLY) {
@@ -54,7 +54,7 @@ void loop() {
 					Serial.println(payload);
 				}
 			} else {
-				Serial.printf("[HTTPS] GET... failed, error: %s\n", https.errorToString(httpCode).c_str());
+				Serial.printf("[HTTPS] POST... failed, error: %s\n", https.errorToString(httpCode).c_str());
 			}
 
 			https.end();
@@ -63,6 +63,6 @@ void loop() {
 		}
 	}
 
-	Serial.println("Wait 10s before next round...");
-	delay(10000);
+	Serial.println("Wait 60s before next round...");
+	delay(60000);
 }
