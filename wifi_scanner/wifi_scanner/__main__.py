@@ -278,9 +278,11 @@ def scan(adapter, scantime, verbose, dictionary, number, nearby, jsonprint, out,
     return adapter, results
 
 
-def main():
-    adapter = 'wlan1'
-    scantime = '5'
+
+@click.command()
+@click.option('-a', '--adapter', default='', help='adapter to use')
+def main(adapter):
+    scantime = '60'
     verbose = False
     dictionary = 'oui.txt'
     number = True
