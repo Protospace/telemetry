@@ -6,13 +6,34 @@ import platform
 import subprocess
 import json
 import time
+import requests
+import logging
 
 import netifaces
 import click
 
-from howmanypeoplearearound.oui import load_dictionary, download_oui
-from howmanypeoplearearound.analysis import analyze_file
-from howmanypeoplearearound.colors import *
+from wifi_scanner.oui import load_dictionary, download_oui
+from wifi_scanner.analysis import analyze_file
+from wifi_scanner.colors import *
+
+def getserial():
+  # Extract serial from cpuinfo file
+  cpuserial = "0000000000000000"
+  try:
+    f = open('/proc/cpuinfo','r')
+    for line in f:
+        if line[0:6]=='Serial':
+            cpuserial = line[10:26]
+    f.close()
+  except:
+      cpuserial = "ERROR000000000"
+ 
+  return cpuserial
+
+SERIAL = getserial()
+
+SEND_BUFFER = []
+IOT_URL = 'http://games.protospace.ca:5000/wifi-scan'
 
 if os.name != 'nt':
     from pick import pick
@@ -36,7 +57,6 @@ def which(program):
                 return exe_file
     raise
 
-
 def showTimer(timeleft):
     """Shows a countdown timer"""
     total = int(timeleft) * 10
@@ -58,38 +78,8 @@ def fileToMacSet(path):
         maclist = f.readlines()
     return set([x.strip() for x in maclist])
 
-@click.command()
-@click.option('-a', '--adapter', default='', help='adapter to use')
-@click.option('-z', '--analyze', default='', help='analyze file')
-@click.option('-s', '--scantime', default='60', help='time in seconds to scan')
-@click.option('-o', '--out', default='', help='output cellphone data to file')
-@click.option('-d', '--dictionary', default='oui.txt', help='OUI dictionary')
-@click.option('-v', '--verbose', help='verbose mode', is_flag=True)
-@click.option('--number', help='just print the number', is_flag=True)
-@click.option('-j', '--jsonprint', help='print JSON of cellphone data', is_flag=True)
-@click.option('-n', '--nearby', help='only quantify signals that are nearby (rssi > -70)', is_flag=True)
-@click.option('--allmacaddresses', help='do not check MAC addresses against the OUI database to only recognize known cellphone manufacturers', is_flag=True)  # noqa
-@click.option('-m', '--manufacturers', default='', help='read list of known manufacturers from file')
-@click.option('--nocorrection', help='do not apply correction', is_flag=True)
-@click.option('--loop', help='loop forever', is_flag=True)
-@click.option('--port', default=8001, help='port to use when serving analysis')
-@click.option('--sort', help='sort cellphone data by distance (rssi)', is_flag=True)
-@click.option('--targetmacs', help='read a file that contains target MAC addresses', default='')
-@click.option('-f', '--pcap', help='read a pcap file instead of capturing')
-def main(adapter, scantime, verbose, dictionary, number, nearby, jsonprint, out, allmacaddresses, manufacturers, nocorrection, loop, analyze, port, sort, targetmacs, pcap):
-    if analyze != '':
-        analyze_file(analyze, port)
-        return
-    if loop:
-        while True:
-            adapter = scan(adapter, scantime, verbose, dictionary, number,
-                 nearby, jsonprint, out, allmacaddresses, manufacturers, nocorrection, loop, sort, targetmacs, pcap)
-    else:
-        scan(adapter, scantime, verbose, dictionary, number,
-             nearby, jsonprint, out, allmacaddresses, manufacturers, nocorrection, loop, sort, targetmacs, pcap)
 
-
-def scan(adapter, scantime, verbose, dictionary, number, nearby, jsonprint, out, allmacaddresses, manufacturers, nocorrection, loop, sort, targetmacs, pcap):
+def scan(adapter, scantime, verbose, dictionary, number, nearby, jsonprint, out, allmacaddresses, manufacturers, nocorrection, sort, targetmacs, pcap):
     """Monitor wifi signals to count the number of people around you"""
 
     # print("OS: " + os.name)
@@ -279,7 +269,44 @@ def scan(adapter, scantime, verbose, dictionary, number, nearby, jsonprint, out,
             print("Wrote %d records to %s" % (len(cellphone_people), out))
     if not pcap:
         os.remove(dump_file)
-    return adapter
+
+    results = {
+        'records': cellphone_people,
+        'time': int(time.time()),
+        'serial': SERIAL,
+    }
+    return adapter, results
+
+
+def main():
+    adapter = 'wlan1'
+    scantime = '5'
+    verbose = False
+    dictionary = 'oui.txt'
+    number = True
+    nearby = False
+    jsonprint = False
+    out = ''
+    allmacaddresses = True
+    manufacturers = ''
+    nocorrection = True
+    sort = False
+    targetmacs = ''
+    pcap = ''
+
+    while True:
+        adapter, results = scan(adapter, scantime, verbose, dictionary, number,
+             nearby, jsonprint, out, allmacaddresses, manufacturers,
+             nocorrection, sort, targetmacs, pcap)
+        SEND_BUFFER.append(results)
+
+        try:
+            while len(SEND_BUFFER):
+                r = requests.post(IOT_URL, json=SEND_BUFFER[0], timeout=5)
+                r.raise_for_status()
+                SEND_BUFFER.pop(0)
+        except:
+            logging.exception('Problem sending to server:')
 
 
 if __name__ == '__main__':

@@ -3,7 +3,7 @@ import datetime
 import json
 import sys
 
-from howmanypeoplearearound.plotlyjs import *
+from wifi_scanner.plotlyjs import *
 
 
 def analyze_file(fname, port):
