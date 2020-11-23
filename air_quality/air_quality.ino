@@ -102,8 +102,8 @@ bool sendSample() {
 
 	String temp = String(sht30.cTemp);
 	Serial.print("[TEMP] Temperature: " + temp + " C\n");
-	String concentration = String(dsm501.getConcentration());
-	Serial.print("[AIR] Concentration: " + concentration + " ug/m3\n");
+	String pm25 = String(dsm501.getConcentration());
+	Serial.print("[AIR] PM2.5: " + pm25 + " ug/m3\n");
 
 	if (!firstIgnored) {
 		Serial.println("[AIR] Ignoring first read");
@@ -113,12 +113,12 @@ bool sendSample() {
 
 	Serial.print("[MQTT] Sending measurement...\n");
 
-	mqttClient.beginMessage("sensors/air/1/temperature");
+	mqttClient.beginMessage("sensors/air/0/temp");
 	mqttClient.print(temp);
 	mqttClient.endMessage();
 
-	mqttClient.beginMessage("sensors/air/1/concentration");
-	mqttClient.print(concentration);
+	mqttClient.beginMessage("sensors/air/0/pm25");
+	mqttClient.print(pm25);
 	mqttClient.endMessage();
 
 	return true;
