@@ -64,6 +64,18 @@ void setup() {
 
 	mqttClient.setUsernamePassword(MQTT_USERNAME, MQTT_PASSWORD);
 
+	Serial.printf("[MQTT] Connecting to broker...\n");
+
+	if (!mqttClient.connect(broker, port)) {
+		Serial.print("[MQTT] Connection failed! Error code = ");
+		Serial.println(mqttClient.connectError());
+		Serial.printf("Resetting Arduino...\n");
+		resetFunc();
+	}
+	mqttClient.beginMessage("sensors/air/0/log");
+	mqttClient.print("Boot up");
+	mqttClient.endMessage();
+
 	// Initialize DSM501:
 	//           PM1.0 pin     PM2.5 pin     sampling duration in seconds
 	dsm501.begin(DSM501_PM1_0, DSM501_PM2_5, SAMPLE_TIME);
@@ -79,6 +91,10 @@ void setup() {
 
 	Serial.println("DSM501 is ready!");
 	Serial.println();
+
+	mqttClient.beginMessage("sensors/air/0/log");
+	mqttClient.print("DSM501 ready");
+	mqttClient.endMessage();
 }
 
 bool sendSample() {
@@ -96,10 +112,10 @@ bool sendSample() {
 		return false;
 	}
 
-	Serial.printf("[MQTT] Connecting to broker...\n");
+	Serial.printf("[MQTT] Checking connection to broker...\n");
 
-	if (!mqttClient.connect(broker, port)) {
-		Serial.print("[MQTT] Connection failed! Error code = ");
+	if (!mqttClient.connected()) {
+		Serial.print("[MQTT] Not connected! Error code = ");
 		Serial.println(mqttClient.connectError());
 		return false;
 	}
@@ -111,6 +127,9 @@ bool sendSample() {
 
 	if (!firstIgnored) {
 		Serial.println("[AIR] Ignoring first read");
+		mqttClient.beginMessage("sensors/air/0/log");
+		mqttClient.print("Ignore first");
+		mqttClient.endMessage();
 		firstIgnored = true;
 		return false;
 	}
@@ -129,10 +148,6 @@ bool sendSample() {
 }
 
 bool printSample() {
-	if (!dsm501.update()) {
-		return false;
-	}
-
 	String concentration = String(dsm501.getConcentration());
 	Serial.print(concentration + "\n");
 
@@ -140,6 +155,7 @@ bool printSample() {
 }
 
 void loop() {
+	if (!mqttClient.connected()) { mqttClient.connect(broker, port); }
 	mqttClient.poll();
 
 	if (sendSample()) {
@@ -149,9 +165,11 @@ void loop() {
 		failCount++;
 	}
 
-
 	if (failCount > MAX_FAILS) {
 		Serial.print("Too many failures, resetting Arduino...\n");
+		mqttClient.beginMessage("sensors/air/0/log");
+		mqttClient.print("Failure reset");
+		mqttClient.endMessage();
 		resetFunc();
 	}
 
