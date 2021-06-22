@@ -9,16 +9,20 @@
 #define DSM501_PM1_0    D7
 #define DSM501_PM2_5    D6
 #define SAMPLE_TIME     60 // seconds
+#define MAX_FAILS       SAMPLE_TIME * 10 * 5  // ~five minutes
 
 WiFiClientSecure wc;
 MqttClient mqttClient(wc);
 SHT3X sht30(0x45);
 DSM501 dsm501;
 
+void (* resetFunc) (void) = 0;
+
 const char broker[] = "webhost.protospace.ca";
 int        port     = 8883;
 
 bool firstIgnored = false;
+long failCount = 0;
 
 void setup() {
 
@@ -138,7 +142,19 @@ bool printSample() {
 void loop() {
 	mqttClient.poll();
 
-	sendSample();
-	//printSample();
+	if (sendSample()) {
+		printSample();
+		failCount = 0;
+	} else {
+		failCount++;
+	}
+
+
+	if (failCount > MAX_FAILS) {
+		Serial.print("Too many failures, resetting Arduino...\n");
+		resetFunc();
+	}
+
+	delay(100);
 }
 
