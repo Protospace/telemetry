@@ -9,7 +9,7 @@
 #define DSM501_PM1_0    D7
 #define DSM501_PM2_5    D6
 #define SAMPLE_TIME     60 // seconds
-#define MAX_FAILS       SAMPLE_TIME * 10 * 5  // ~five minutes
+#define MAX_FAILS       5
 
 WiFiClientSecure wc;
 MqttClient mqttClient(wc);
@@ -44,9 +44,9 @@ void setup() {
 	}
 	Serial.println("");
 
-	// Synchronize time useing SNTP. This is necessary to verify that
+	// Synchronize time using NTP. This is necessary to verify that
 	// the TLS certificates offered by the server are currently valid.
-	Serial.print("Setting time using SNTP");
+	Serial.print("Setting time using NTP");
 	configTime(8 * 3600, 0, "pool.ntp.org", "time.nist.gov");
 	time_t now = time(nullptr);
 	while (now < 8 * 3600 * 2) {
@@ -82,8 +82,9 @@ void setup() {
 
 	// Wait 120s for DSM501 to warm up
 	Serial.println("Wait 120s for DSM501 to warm up");
-	for (int i = 1; i <= 120; i++)
+	for (int i = 1; i <= 10; i++)
 	{
+		mqttClient.poll();
 		delay(1000); // 1s
 		Serial.print(i);
 		Serial.println(" s (wait 120s for DSM501 to warm up)");
@@ -97,19 +98,21 @@ void setup() {
 	mqttClient.endMessage();
 }
 
-bool sendSample() {
+int sendSample() {
 	if (!dsm501.update()) {
-		return false;
+		return -1;
 	}
 
 	if (sht30.get()) {
 		Serial.printf("[TEMP] Unable to get temperature\n");
-		return false;
+		return 0;
 	}
 
 	if (WiFi.status() != WL_CONNECTED) {
 		Serial.printf("[WIFI] Not connected\n");
-		return false;
+		Serial.printf("[WIFI] Reconnecting...\n");
+		WiFi.begin("Protospace", "yycmakers");
+		return 0;
 	}
 
 	Serial.printf("[MQTT] Checking connection to broker...\n");
@@ -117,7 +120,9 @@ bool sendSample() {
 	if (!mqttClient.connected()) {
 		Serial.print("[MQTT] Not connected! Error code = ");
 		Serial.println(mqttClient.connectError());
-		return false;
+		Serial.printf("[MQTT] Reconnecting...\n");
+		mqttClient.connect(broker, port); 
+		return 0;
 	}
 
 	String temp = String(sht30.cTemp);
@@ -131,7 +136,15 @@ bool sendSample() {
 		mqttClient.print("Ignore first");
 		mqttClient.endMessage();
 		firstIgnored = true;
-		return false;
+		return 0;
+	}
+
+	if (pm25 == "0.00") {
+		Serial.println("[AIR] Bad zero reading");
+		mqttClient.beginMessage("sensors/air/0/log");
+		mqttClient.print("Bad zero reading");
+		mqttClient.endMessage();
+		return 0;
 	}
 
 	Serial.print("[MQTT] Sending measurement...\n");
@@ -144,35 +157,28 @@ bool sendSample() {
 	mqttClient.print(pm25);
 	mqttClient.endMessage();
 
-	return true;
-}
-
-bool printSample() {
-	String concentration = String(dsm501.getConcentration());
-	Serial.print(concentration + "\n");
-
-	return true;
+	Serial.print("Done.\n");
+	return 1;
 }
 
 void loop() {
-	if (!mqttClient.connected()) { mqttClient.connect(broker, port); }
 	mqttClient.poll();
 
-	if (sendSample()) {
-		printSample();
+	int res = sendSample();
+	if (res == 1) {
 		failCount = 0;
-	} else {
+		Serial.println("Reset fail count.");
+	} else if (res == 0) {
 		failCount++;
+		Serial.print("Increased fail count to: ");
+		Serial.println(failCount);
 	}
 
-	if (failCount > MAX_FAILS) {
+	if (failCount >= MAX_FAILS) {
 		Serial.print("Too many failures, resetting Arduino...\n");
 		mqttClient.beginMessage("sensors/air/0/log");
 		mqttClient.print("Failure reset");
 		mqttClient.endMessage();
 		resetFunc();
 	}
-
-	delay(100);
 }
-
