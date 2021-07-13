@@ -21,8 +21,18 @@ void (* resetFunc) (void) = 0;
 const char broker[] = "webhost.protospace.ca";
 int        port     = 8883;
 
+#define PM25_TOPIC   "test/air/1/pm25"
+#define TEMP_TOPIC   "test/air/1/temp"
+#define LOG_TOPIC    "test/air/1/log"
+
 bool firstIgnored = false;
 long failCount = 0;
+
+void sendMqtt(String topic, String msg) {
+  mqttClient.beginMessage(topic);
+  mqttClient.print(msg);
+  mqttClient.endMessage();
+}
 
 void setup() {
 
@@ -74,9 +84,8 @@ void setup() {
 		Serial.printf("Resetting Arduino...\n");
 		resetFunc();
 	}
-	mqttClient.beginMessage("/test/air/1/pm25");
-	mqttClient.print("Boot up");
-	mqttClient.endMessage();
+
+  sendMqtt(LOG_TOPIC, "Boot up");
 
 	// Initialize DSM501:
 	//           PM1.0 pin     PM2.5 pin     sampling duration in seconds
@@ -84,7 +93,7 @@ void setup() {
 
 	// Wait 120s for DSM501 to warm up
 	Serial.println("Wait 120s for DSM501 to warm up");
-	for (int i = 1; i <= 10; i++)
+	for (int i = 1; i <= 120; i++)
 	{
 		mqttClient.poll();
 		delay(1000); // 1s
@@ -95,9 +104,7 @@ void setup() {
 	Serial.println("DSM501 is ready!");
 	Serial.println();
 
-	mqttClient.beginMessage("sensors/air/0/log");
-	mqttClient.print("DSM501 ready");
-	mqttClient.endMessage();
+  sendMqtt(LOG_TOPIC, "DSM501 ready");
 }
 
 int sendSample() {
@@ -134,30 +141,20 @@ int sendSample() {
 
 	if (!firstIgnored) {
 		Serial.println("[AIR] Ignoring first read");
-		mqttClient.beginMessage("sensors/air/0/log");
-		mqttClient.print("Ignore first");
-		mqttClient.endMessage();
+    sendMqtt(LOG_TOPIC, "Ignore first");
 		firstIgnored = true;
 		return 0;
 	}
 
 	if (pm25 == "0.00") {
 		Serial.println("[AIR] Bad zero reading");
-		mqttClient.beginMessage("sensors/air/0/log");
-		mqttClient.print("Bad zero reading");
-		mqttClient.endMessage();
+    sendMqtt(LOG_TOPIC, "Bad zero reading");
 		return 0;
 	}
 
 	Serial.print("[MQTT] Sending measurement...\n");
-
-	mqttClient.beginMessage("sensors/air/0/temp");
-	mqttClient.print(temp);
-	mqttClient.endMessage();
-
-	mqttClient.beginMessage("sensors/air/0/pm25");
-	mqttClient.print(pm25);
-	mqttClient.endMessage();
+  sendMqtt(TEMP_TOPIC, temp);
+  sendMqtt(PM25_TOPIC, pm25);
 
 	Serial.print("Done.\n");
 	return 1;
@@ -178,9 +175,7 @@ void loop() {
 
 	if (failCount >= MAX_FAILS) {
 		Serial.print("Too many failures, resetting Arduino...\n");
-		mqttClient.beginMessage("sensors/air/0/log");
-		mqttClient.print("Failure reset");
-		mqttClient.endMessage();
+    sendMqtt(LOG_TOPIC, "Failure reset");
 		resetFunc();
 	}
 }
