@@ -60,9 +60,9 @@ void setup() {
 	Serial.print("Current time: ");
 	Serial.print(asctime(&timeinfo));
 
-	//wc.setCACert_P(lets_encrypt_ca, lets_encrypt_ca_len);
   X509List cert(lets_encrypt_ca);
   wc.setTrustAnchors(&cert);
+  // wc.setInsecure();  // disables all SSL checks. don't use in production
   
 	mqttClient.setUsernamePassword(MQTT_USERNAME, MQTT_PASSWORD);
 
