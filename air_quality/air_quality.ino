@@ -27,7 +27,7 @@ long failCount = 0;
 void setup() {
 
 	Serial.begin(115200);
-	// Serial.setDebugOutput(true);
+	Serial.setDebugOutput(true);
 
 	Serial.println();
 	Serial.println();
@@ -36,13 +36,13 @@ void setup() {
 	delay(1000);
 
 	WiFi.mode(WIFI_STA);
-	WiFi.begin("Protospace", "yycmakers");
+	WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
 	Serial.print("Connecting to WiFi");
 	while (WiFi.status() != WL_CONNECTED) {
 		delay(500);
 		Serial.print(".");
 	}
-	Serial.println("");
+	Serial.println("Connected to WiFi");
 
 	// Synchronize time using NTP. This is necessary to verify that
 	// the TLS certificates offered by the server are currently valid.
@@ -60,8 +60,10 @@ void setup() {
 	Serial.print("Current time: ");
 	Serial.print(asctime(&timeinfo));
 
-	wc.setCACert_P(lets_encrypt_ca, lets_encrypt_ca_len);
-
+  X509List cert(lets_encrypt_ca);
+  wc.setTrustAnchors(&cert);
+  // wc.setInsecure();  // disables all SSL checks. don't use in production
+  
 	mqttClient.setUsernamePassword(MQTT_USERNAME, MQTT_PASSWORD);
 
 	Serial.printf("[MQTT] Connecting to broker...\n");
@@ -72,7 +74,7 @@ void setup() {
 		Serial.printf("Resetting Arduino...\n");
 		resetFunc();
 	}
-	mqttClient.beginMessage("sensors/air/0/log");
+	mqttClient.beginMessage("/test/air/1/pm25");
 	mqttClient.print("Boot up");
 	mqttClient.endMessage();
 
@@ -111,7 +113,7 @@ int sendSample() {
 	if (WiFi.status() != WL_CONNECTED) {
 		Serial.printf("[WIFI] Not connected\n");
 		Serial.printf("[WIFI] Reconnecting...\n");
-		WiFi.begin("Protospace", "yycmakers");
+    WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
 		return 0;
 	}
 
