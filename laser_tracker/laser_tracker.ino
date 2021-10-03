@@ -9,9 +9,11 @@ ESP8266WiFiMulti WiFiMulti;
 
 #define ANALOG_PIN		A0
 
-// should sample for 10 seconds at 200 Hz
-#define SAMPLE_DELAY	5
-#define NUM_SAMPLES		2000
+// should sample for 1 second at 200 Hz x 20
+#define SAMPLE_DELAY        5
+#define NUM_SAMPLES         200
+#define NUM_AVERAGES        20
+#define POWER_THRESHOLD     150
 
 void setup() {
 
@@ -32,19 +34,31 @@ void setup() {
 }
 
 int getSample() {
-	Serial.println("[DATA] Sampling power data for 10 seconds...");
+	Serial.println("[DATA] Sampling power data for 20 seconds...");
+	Serial.print("[DATA] Samples: ");
 
-	long total = 0;
+	int numAbove = 0;
 
-	for (int i = 0; i < NUM_SAMPLES; i++) {
-		int sample = analogRead(ANALOG_PIN);
-		total += sample;
-		delay(SAMPLE_DELAY);
+	for (int j = 0; j < NUM_AVERAGES; j++) {
+		long total = 0;
+
+		for (int i = 0; i < NUM_SAMPLES; i++) {
+			int sample = analogRead(ANALOG_PIN);
+			total += sample;
+			delay(SAMPLE_DELAY);
+		}
+
+		int average = total / NUM_SAMPLES;
+		Serial.printf("%d, ", average);
+
+		if (average > POWER_THRESHOLD) {
+			numAbove++;
+		}
 	}
 
-	int average = total / NUM_SAMPLES;
-	Serial.printf("[DATA] Average power: %d\n", average);
-	return average;
+	Serial.println();
+	Serial.printf("[DATA] Num samples above threshold: %d\n", numAbove);
+	return numAbove;
 }
 
 bool sendData(String url, int data) {
