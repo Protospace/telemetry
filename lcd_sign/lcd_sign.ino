@@ -9,15 +9,29 @@
 
 ESP8266WiFiMulti WiFiMulti;
 
-const int rs = D8, en = D7;
-LiquidCrystal lcd(rs, en, D1, D2, D3, D4);
+#include <LiquidCrystal_74HC595.h>
+//Wemos pins
+#define SHCP D7 // Serial Clock SRCLK 74HC595 pin 11
+#define STCP D6 // Regiser Clock RCLK 74HC595 pin 12
+#define DS D5   // Serial Data SER    74HC595 pin 14
+
+//74HC595 pins new prototype 2021-12-04
+#define RS 7
+#define E 5
+#define d4 4
+#define d5 3
+#define d6 2
+#define d7 1
+
+LiquidCrystal_74HC595 lcd(DS, SHCP, STCP, RS, E, d4, d5, d6, d7);
 
 void setup() {
 
 	Serial.begin(115200);
 	// Serial.setDebugOutput(true);
 
-	lcd.begin(20, 2);
+	lcd.begin(16, 2);
+	lcd.noAutoscroll();
 
 	Serial.println();
 	Serial.println();
@@ -83,9 +97,10 @@ bool getMessage(String url) {
 	Serial.println("[DATA] Sign:");
 	Serial.println(sign);
 
+	lcd.clear();
+	lcd.print(sign.substring(0, 16));
 	lcd.setCursor(0, 1);
-	lcd.print(sign);
-
+	lcd.print(sign.substring(16, 32));
 
 	https.end();
 	return true;
