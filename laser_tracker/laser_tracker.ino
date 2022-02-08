@@ -110,6 +110,6 @@ bool sendData(String url, int data) {
 void loop() {
 	int data = getSample();
 
-	//sendData("https://api.my.protospace.ca/stats/usage/", data);
-	sendData("https://api.spaceport.dns.t0.vc/stats/usage/", data);
+	sendData("https://api.my.protospace.ca/stats/usage/", data);
+	//sendData("https://api.spaceport.dns.t0.vc/stats/usage/", data);
 }
