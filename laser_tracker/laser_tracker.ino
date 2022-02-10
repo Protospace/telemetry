@@ -13,7 +13,7 @@ ESP8266WiFiMulti WiFiMulti;
 #define SAMPLE_DELAY        5
 #define NUM_SAMPLES         200
 #define NUM_AVERAGES        20
-#define POWER_THRESHOLD     100
+#define POWER_THRESHOLD     125
 
 void setup() {
 
