@@ -6,6 +6,7 @@
 #include <ESP8266HTTPClient.h>
 #include <WiFiClientSecureBearSSL.h>
 #include <LiquidCrystal.h>
+#include "TM1637.h"
 
 ESP8266WiFiMulti WiFiMulti;
 
@@ -25,6 +26,11 @@ ESP8266WiFiMulti WiFiMulti;
 
 LiquidCrystal_74HC595 lcd(DS, SHCP, STCP, RS, E, d4, d5, d6, d7);
 
+#define CLK D1
+#define DIO D0
+
+TM1637 tm1637(CLK,DIO);
+
 void setup() {
 
 	Serial.begin(115200);
@@ -32,6 +38,9 @@ void setup() {
 
 	lcd.begin(16, 2);
 	lcd.noAutoscroll();
+
+	tm1637.set();
+	tm1637.init();
 
 	Serial.println();
 	Serial.println();
@@ -46,6 +55,12 @@ void setup() {
 
 }
 
+void displayNumber(TM1637 tm, int num){   
+    tm.display(3, num % 10);   
+    tm.display(2, num / 10 % 10);   
+    tm.display(1, num / 100 % 10);   
+    //tm.display(0, num / 1000 % 10);
+}
 
 bool getMessage(String url) {
 	Serial.print("[HTTP] Getting stats from ");
@@ -93,6 +108,7 @@ bool getMessage(String url) {
 	JsonObject& root = jsonBuffer.parseObject(payload);
 
 	String sign = root["sign"];
+	int member_count = root["member_count"];
 
 	Serial.println("[DATA] Sign:");
 	Serial.println(sign);
@@ -101,6 +117,8 @@ bool getMessage(String url) {
 	lcd.print(sign.substring(0, 16));
 	lcd.setCursor(0, 1);
 	lcd.print(sign.substring(16, 32));
+
+	displayNumber(tm1637, member_count);
 
 	https.end();
 	return true;
