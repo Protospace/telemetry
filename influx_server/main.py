@@ -11,6 +11,8 @@ client = InfluxDBClient('localhost', 8086, database='telegraf')
 SENSORS = [
     ('air', 0, 'pm25'),
     ('air', 0, 'temp'),
+    ('air', 1, 'pm25'),
+    ('air', 1, 'temp'),
 ]
 
 TIMEZONE = pytz.timezone('America/Edmonton')
@@ -28,7 +30,8 @@ Sensors
 -------
 
 Air:
-    0: Classroom ceiling PM2.5 particulate and temperature sensor.
+    0: Classroom ceiling PM2.5 particulate in ug/m3 and temperature sensor.
+    1: Wood shop ceiling PM2.5 particulate in ug/m3 and temperature sensor.
 
 
 Routes
@@ -41,10 +44,14 @@ Get the last value recorded for that sensor.
 Current measurements:
     /sensors/air/0/temp
     /sensors/air/0/pm25
+    /sensors/air/1/temp
+    /sensors/air/1/pm25
 
 Examples:
     <a href="https://ps-iot.dns.t0.vc/sensors/air/0/temp">https://ps-iot.dns.t0.vc/sensors/air/0/temp</a>
     <a href="https://ps-iot.dns.t0.vc/sensors/air/0/pm25">https://ps-iot.dns.t0.vc/sensors/air/0/pm25</a>
+    <a href="https://ps-iot.dns.t0.vc/sensors/air/1/temp">https://ps-iot.dns.t0.vc/sensors/air/1/temp</a>
+    <a href="https://ps-iot.dns.t0.vc/sensors/air/1/pm25">https://ps-iot.dns.t0.vc/sensors/air/1/pm25</a>
 
 
 <b>GET /sensors/{kind}/{num}/{measurement}/today</b>
@@ -63,7 +70,7 @@ Get all sensor readings from the specified duration.
 Current durations:
     day (last 24 hours)
     week (last 7 days)
-    month (last 7 days)
+    month (last 30 days)
 
 Examples:
     <a href="https://ps-iot.dns.t0.vc/sensors/air/0/temp/day">https://ps-iot.dns.t0.vc/sensors/air/0/temp/day</a>
