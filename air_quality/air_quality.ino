@@ -29,9 +29,9 @@ bool firstIgnored = false;
 long failCount = 0;
 
 void sendMqtt(String topic, String msg) {
-  mqttClient.beginMessage(topic);
-  mqttClient.print(msg);
-  mqttClient.endMessage();
+	mqttClient.beginMessage(topic);
+	mqttClient.print(msg);
+	mqttClient.endMessage();
 }
 
 void setup() {
@@ -70,10 +70,10 @@ void setup() {
 	Serial.print("Current time: ");
 	Serial.print(asctime(&timeinfo));
 
-  X509List cert(lets_encrypt_ca);
-  wc.setTrustAnchors(&cert);
-  // wc.setInsecure();  // disables all SSL checks. don't use in production
-  
+	X509List cert(lets_encrypt_ca);
+	wc.setTrustAnchors(&cert);
+	// wc.setInsecure();  // disables all SSL checks. don't use in production
+
 	mqttClient.setUsernamePassword(MQTT_USERNAME, MQTT_PASSWORD);
 
 	Serial.printf("[MQTT] Connecting to broker...\n");
@@ -85,7 +85,7 @@ void setup() {
 		resetFunc();
 	}
 
-  sendMqtt(LOG_TOPIC, "Boot up");
+	sendMqtt(LOG_TOPIC, "Boot up");
 
 	// Initialize DSM501:
 	//           PM1.0 pin     PM2.5 pin     sampling duration in seconds
@@ -104,7 +104,7 @@ void setup() {
 	Serial.println("DSM501 is ready!");
 	Serial.println();
 
-  sendMqtt(LOG_TOPIC, "DSM501 ready");
+	sendMqtt(LOG_TOPIC, "DSM501 ready");
 }
 
 int sendSample() {
@@ -120,7 +120,7 @@ int sendSample() {
 	if (WiFi.status() != WL_CONNECTED) {
 		Serial.printf("[WIFI] Not connected\n");
 		Serial.printf("[WIFI] Reconnecting...\n");
-    WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+		WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
 		return 0;
 	}
 
@@ -141,20 +141,20 @@ int sendSample() {
 
 	if (!firstIgnored) {
 		Serial.println("[AIR] Ignoring first read");
-    sendMqtt(LOG_TOPIC, "Ignore first");
+		sendMqtt(LOG_TOPIC, "Ignore first");
 		firstIgnored = true;
 		return 0;
 	}
 
 	if (pm25 == "0.00") {
 		Serial.println("[AIR] Bad zero reading");
-    sendMqtt(LOG_TOPIC, "Bad zero reading");
+		sendMqtt(LOG_TOPIC, "Bad zero reading");
 		return 0;
 	}
 
 	Serial.print("[MQTT] Sending measurement...\n");
-  sendMqtt(TEMP_TOPIC, temp);
-  sendMqtt(PM25_TOPIC, pm25);
+	sendMqtt(TEMP_TOPIC, temp);
+	sendMqtt(PM25_TOPIC, pm25);
 
 	Serial.print("Done.\n");
 	return 1;
@@ -175,7 +175,7 @@ void loop() {
 
 	if (failCount >= MAX_FAILS) {
 		Serial.print("Too many failures, resetting Arduino...\n");
-    sendMqtt(LOG_TOPIC, "Failure reset");
+		sendMqtt(LOG_TOPIC, "Failure reset");
 		resetFunc();
 	}
 }
