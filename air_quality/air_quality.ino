@@ -4,6 +4,7 @@
 #include <WiFi.h>
 #include <WiFiClientSecure.h>
 #include "Adafruit_PM25AQI.h"
+#include "Adafruit_SGP30.h"
 #include "secrets.h"
 #include "lets_encrypt_ca.h"
 
@@ -15,6 +16,8 @@ WiFiClientSecure wc;
 MqttClient mqttClient(wc);
 
 Adafruit_PM25AQI aqi = Adafruit_PM25AQI();
+
+Adafruit_SGP30 sgp;
 
 void (* resetFunc) (void) = 0;
 
@@ -100,6 +103,20 @@ void setup() {
 		resetFunc();
 	}
 	delay(1000);
+
+	if (sgp.begin()){
+		sendMqtt(LOG_TOPIC, "[META] Started VOC sensor");
+	} else {
+		sendMqtt(LOG_TOPIC, "[META] Error starting VOC sensor");
+		resetFunc();
+	}
+	delay(1000);
+
+	if (sgp.serialnumber[2] == 0x2D3E) {
+		sgp.setIAQBaseline(0x8EAA, 0x8DB5);
+		Serial.println("[META] Set baseline to: 0x8EAA 0x8DB5");
+	}
+	delay(1000);
 }
 
 int sendSample(String data) {
@@ -152,6 +169,10 @@ void loop() {
 	static float total_050um = 0;
 	static float total_100um = 0;
 
+	static int num_voc_samples = 0;
+	static float total_tvoc = 0;
+	static float total_eco2 = 0;
+
 	mqttClient.poll();
 
 	//  ============= Dust Sensor ==============
@@ -175,6 +196,16 @@ void loop() {
 	}
 
 
+	//  ============= VOC Sensor ===============
+
+	if (sgp.IAQmeasure()) {
+		total_tvoc += sgp.TVOC;
+		total_eco2 += sgp.eCO2;
+
+		num_voc_samples++;
+	}
+
+
 	//  ============= Send Sample ==============
 
 	unsigned long now_ms = millis();
@@ -185,7 +216,7 @@ void loop() {
 		prev_sent_time = now_ms;
 
 		String data = "";
-		const size_t capacity = JSON_OBJECT_SIZE(13);
+		const size_t capacity = JSON_OBJECT_SIZE(15);
 		StaticJsonBuffer<capacity> jsonBuffer;
 
 		JsonObject& root = jsonBuffer.createObject();
@@ -217,6 +248,13 @@ void loop() {
 		total_025um = 0;
 		total_050um = 0;
 		total_100um = 0;
+
+		// voc
+		root["tvoc"] = total_tvoc / num_voc_samples;
+		root["eco2"] = total_eco2 / num_voc_samples;
+		num_voc_samples = 0;
+		total_tvoc = 0;
+		total_eco2 = 0;
 
 
 		root.printTo(data);
