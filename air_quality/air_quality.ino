@@ -1,3 +1,6 @@
+// Protospace Air Quality sensor V2
+// Board: Adafruit QT Py ESP32-S2
+
 #include <Arduino.h>
 #include <ArduinoJson.h>
 #include <ArduinoMqttClient.h>
@@ -24,9 +27,9 @@ void (* resetFunc) (void) = 0;
 const char broker[] = "webhost.protospace.ca";
 int        port     = 8883;
 
-#define DATA_TOPIC   "test/air/1/data"
-#define LOG_TOPIC    "test/air/1/log"
-#define MQTT_ID      "air1"
+#define DATA_TOPIC   "test/air/3/data"
+#define LOG_TOPIC    "test/air/3/log"
+#define MQTT_ID      "air3"
 
 long failCount = 0;
 int initial_ignored_count = 0;
@@ -74,7 +77,8 @@ void setup() {
 	struct tm timeinfo;
 	gmtime_r(&now, &timeinfo);
 	Serial.print("[TIME] Current time: ");
-	Serial.println(asctime(&timeinfo));
+	Serial.print(asctime(&timeinfo));
+	Serial.println(" UTC");
 
 	//X509List cert(lets_encrypt_ca);
 	//wc.setTrustAnchors(&cert);
@@ -217,9 +221,8 @@ void loop() {
 
 		String data = "";
 		const size_t capacity = JSON_OBJECT_SIZE(15);
-		StaticJsonBuffer<capacity> jsonBuffer;
+		StaticJsonDocument<capacity> root;
 
-		JsonObject& root = jsonBuffer.createObject();
 		root["id"] = MQTT_ID;
 
 		// dust
@@ -257,7 +260,7 @@ void loop() {
 		total_eco2 = 0;
 
 
-		root.printTo(data);
+		serializeJson(root, data);
 
 		if (sendSample(data) == 1) {
 			num_fails = 0;
