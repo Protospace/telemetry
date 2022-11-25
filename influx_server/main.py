@@ -111,26 +111,32 @@ Examples:
     <a href="https://ps-iot.dns.t0.vc/sensors/air/0/pm25/today?window=1&moving_average=100">https://ps-iot.dns.t0.vc/sensors/air/0/pm25/today?window=1&moving_average=100</a>
 </pre>'''
 
-@app.route('/sensors/<string:kind>/<int:num>/<string:measurement>')
-def sensors(kind, num, measurement):
+@app.route('/<string:domain>/<string:kind>/<int:num>/<string:measurement>')
+def sensors(domain, kind, num, measurement):
     if (kind, num, measurement) not in SENSORS:
         abort(404)
 
-    topic = 'sensors/{}/{}/{}'.format(kind, num, measurement)
+    if domain not in ['sensors', 'test']:
+        abort(404)
+
+    topic = '{}/{}/{}/{}'.format(domain, kind, num, measurement)
     q = 'select last(value) as value from mqtt_consumer where "topic" = \'' + topic + '\''
     result = list(client.query(q).get_points())[0]
 
     return result
 
-@app.route('/sensors/<string:kind>/<int:num>/<string:measurement>/<string:lookup>')
-def sensors_history(kind, num, measurement, lookup):
+@app.route('/<string:domain>/<string:kind>/<int:num>/<string:measurement>/<string:lookup>')
+def sensors_history(domain, kind, num, measurement, lookup):
     if (kind, num, measurement) not in SENSORS:
+        abort(404)
+
+    if domain not in ['sensors', 'test']:
         abort(404)
 
     window = request.args.get('window', 15)
     moving_average = request.args.get('moving_average', None)
 
-    topic = 'sensors/{}/{}/{}'.format(kind, num, measurement)
+    topic = '{}/{}/{}/{}'.format(domain, kind, num, measurement)
 
     try:
         parse_date = datetime.strptime(lookup, '%Y-%m-%d')
