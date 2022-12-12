@@ -27,9 +27,9 @@ void (* resetFunc) (void) = 0;
 const char broker[] = "webhost.protospace.ca";
 int        port     = 8883;
 
-#define DATA_TOPIC   "test/air/3/data"
-#define LOG_TOPIC    "test/air/3/log"
-#define MQTT_ID      "air3"
+#define DATA_TOPIC   "test/air/4/data"
+#define LOG_TOPIC    "test/air/4/log"
+#define MQTT_ID      "air4"
 
 long failCount = 0;
 int initial_ignored_count = 0;
@@ -41,9 +41,14 @@ void sendMqtt(String topic, String msg) {
 	mqttClient.endMessage();
 }
 
+// from https://arduinojson.org/v6/how-to/configure-the-serialization-of-floats
+double round2(double value) {
+	return (int)(value * 100 + 0.5) / 100.0;
+}
+
 void setup() {
 	Serial.begin(115200);
-	while (!Serial) delay(10);
+	delay(1000);
 	//Serial.setDebugOutput(true);
 
 	Serial.println();
@@ -226,18 +231,18 @@ void loop() {
 		root["id"] = MQTT_ID;
 
 		// dust
-		root["p01_std"] = total_p01_std / num_dust_samples;
-		root["p25_std"] = total_p25_std / num_dust_samples;
-		root["p10_std"] = total_p10_std / num_dust_samples;
-		root["p01_env"] = total_p01_env / num_dust_samples;
-		root["p25_env"] = total_p25_env / num_dust_samples;
-		root["p10_env"] = total_p10_env / num_dust_samples;
-		root["003um"] = total_003um / num_dust_samples;
-		root["005um"] = total_005um / num_dust_samples;
-		root["010um"] = total_010um / num_dust_samples;
-		root["025um"] = total_025um / num_dust_samples;
-		root["050um"] = total_050um / num_dust_samples;
-		root["100um"] = total_100um / num_dust_samples;
+		root["p01_std"] = round2(total_p01_std / num_dust_samples);
+		root["p25_std"] = round2(total_p25_std / num_dust_samples);
+		root["p10_std"] = round2(total_p10_std / num_dust_samples);
+		root["p01_env"] = round2(total_p01_env / num_dust_samples);
+		root["p25_env"] = round2(total_p25_env / num_dust_samples);
+		root["p10_env"] = round2(total_p10_env / num_dust_samples);
+		root["003um"] = round2(total_003um / num_dust_samples);
+		root["005um"] = round2(total_005um / num_dust_samples);
+		root["010um"] = round2(total_010um / num_dust_samples);
+		root["025um"] = round2(total_025um / num_dust_samples);
+		root["050um"] = round2(total_050um / num_dust_samples);
+		root["100um"] = round2(total_100um / num_dust_samples);
 		num_dust_samples = 0;
 		total_p01_std = 0;
 		total_p25_std = 0;
