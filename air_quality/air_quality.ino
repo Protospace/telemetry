@@ -258,8 +258,8 @@ void loop() {
 		total_100um = 0;
 
 		// voc
-		root["tvoc"] = total_tvoc / num_voc_samples;
-		root["eco2"] = total_eco2 / num_voc_samples;
+		root["tvoc"] = round2(total_tvoc / num_voc_samples);
+		root["eco2"] = round2(total_eco2 / num_voc_samples);
 		num_voc_samples = 0;
 		total_tvoc = 0;
 		total_eco2 = 0;
