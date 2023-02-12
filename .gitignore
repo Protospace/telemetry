@@ -1,4 +1,6 @@
 *.swp
 *.swo
+env/
+data/
 
 secrets.h
