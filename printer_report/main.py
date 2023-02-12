@@ -4,6 +4,9 @@ logging.basicConfig(
         format='[%(asctime)s] %(levelname)s %(module)s/%(funcName)s - %(message)s',
         level=logging.DEBUG if DEBUG else logging.INFO)
 
+logging.info('')
+logging.info('===== BOOT UP =====')
+
 import asyncore
 from smtpd import SMTPServer
 
@@ -74,6 +77,7 @@ class mySMTPServer(SMTPServer):
 def run():
     _ = mySMTPServer(('0.0.0.0', 1025), None)
     try:
+        logging.info('Starting event loop...')
         asyncore.loop()
     except KeyboardInterrupt:
         pass
