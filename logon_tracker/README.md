@@ -14,4 +14,4 @@ Note that these procedures need to run with a logon ID that has local administra
 3. Copy the file Logon_Tracker_shortcut.lnk to the following directory:
   **c:\ProgramData\Microsoft\Windows\Start Menu\Programs\StartUp**<br>
   This file simply launches the command file "C:\PSFiles\Logon_Tracker.cmd" but with certain attributes.<br>
-  Ensure that the properties of the shortcut include running the program Minimized and also with elevated priviledges.  
+  Ensure that the properties of the shortcut include running the program Minimized.
