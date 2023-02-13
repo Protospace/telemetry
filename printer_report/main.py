@@ -19,7 +19,7 @@ import requests
 import time
 import json
 
-PROTOCOIN_PRINTER_URL = 'https://api.spaceport.dns.t0.vc/protocoin/printer_report/'
+PROTOCOIN_PRINTER_URL = 'https://api.my.protospace.ca/protocoin/printer_report/'
 
 class mySMTPServer(SMTPServer):
     def process_message(self, peer, mailfrom, rcpttos, data, **kwargs):
