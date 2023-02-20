@@ -54,6 +54,11 @@ bool getBalance(String url) {
 
 	if (WiFiMulti.run() != WL_CONNECTED) {
 		Serial.println("[WIFI] Not connected yet.");
+
+		lcd.clear();
+		lcd.home();
+		lcd.print("NO WIFI");
+
 		return false;
 	}
 
@@ -65,6 +70,11 @@ bool getBalance(String url) {
 	if (!https.begin(*client, url)) {
 		Serial.println("[HTTP] Unable to connect.");
 		https.end();
+
+		lcd.clear();
+		lcd.home();
+		lcd.print("BAD CONNECT");
+
 		return false;
 	}
 
@@ -73,6 +83,11 @@ bool getBalance(String url) {
 	if (httpCode <= 0) {
 		Serial.printf("[HTTP] GET... failed, error: %s\n", https.errorToString(httpCode).c_str());
 		https.end();
+
+		lcd.clear();
+		lcd.home();
+		lcd.print("GET FAILED");
+
 		return false;
 	}
 
@@ -82,6 +97,11 @@ bool getBalance(String url) {
 	if (httpCode != HTTP_CODE_OK) {
 		Serial.println("[HTTP] Bad response code.");
 		https.end();
+
+		lcd.clear();
+		lcd.home();
+		lcd.print("BAD RESP CODE");
+
 		return false;
 	}
 
