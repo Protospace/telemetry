@@ -19,6 +19,8 @@ import requests
 import time
 import json
 
+import secrets
+
 PROTOCOIN_PRINTER_URL = 'https://api.my.protospace.ca/protocoin/printer_report/'
 
 class mySMTPServer(SMTPServer):
@@ -67,7 +69,8 @@ class mySMTPServer(SMTPServer):
 
         logging.info('Sending to portal:\n' + str(print_info))
 
-        r = requests.post(PROTOCOIN_PRINTER_URL, json=print_info, timeout=10)
+        headers = {'Authorization': 'Bearer ' + secrets.PRINTER_API_TOKEN}
+        r = requests.post(PROTOCOIN_PRINTER_URL, json=print_info, headers=headers, timeout=10)
         r.raise_for_status()
 
         logging.info('Done.')
