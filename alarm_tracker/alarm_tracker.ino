@@ -1,5 +1,19 @@
 /*
  *  Spaceport Push Notification 1.5 (esp8266)
+ *  Board: LOLIN(WEMOS) D1 R2 & mini
+ *
+ *  Sample messages:
+ *  {'data': 'Connected'}
+ *  {'data': 'Trouble status on'}
+ *  {'data': 'Exit delay in progress: Partition 1'}
+ *  {'data': 'Disarmed: Partition 1'}
+ *  {'data': 'Armed away: Partition 1'}
+ *  {'data': 'Alarm: Partition 1'}
+ *  {'data': 'Alarm: Partition 2'}
+ *  {'data': 'Zone alarm restored: 1'}
+ *  {'data': 'Zone alarm restored: 3'}
+ *  {'data': 'Disarmed: Partition 1'}
+ *  {'data': 'Disarmed: Partition 2'}
  *
  *  Processes the security system status and demonstrates how to send a push notification when the status has changed.
  *  This example sends notifications via Spaceport: https://api.my.protospace.ca
@@ -54,11 +68,8 @@
 #include <ESP8266WiFi.h>
 #include <dscKeybusInterface.h>
 
-// Settings
-const char* wifiSSID = "";
-const char* wifiPassword = "";
-const char* spaceportToken = "";  // Set the access token generated in the Spaceport secrets.py file
-const char* messagePrefix = "[Security system] ";  // Set a prefix for all messages
+#include "secrets.h"
+
 
 // Configures the Keybus interface with the specified pins.
 #define dscClockPin D1  // GPIO 5
@@ -121,6 +132,7 @@ void setup() {
 	WiFi.mode(WIFI_STA);
 	WiFi.begin(wifiSSID, wifiPassword);
 	ipClient.setTrustAnchors(&spaceportCert);
+	//ipClient.setInsecure();
 	while (WiFi.status() != WL_CONNECTED) {
 		Serial.print(".");
 		delay(500);
@@ -337,26 +349,26 @@ bool sendMessage(const char* messageContent) {
 
 	// Connects and sends the message as a Spaceport note-type push
 	if (!ipClient.connect("api.my.protospace.ca", 443)) return false;
-	ipClient.println(F("POST /v2/pushes HTTP/1.1"));
+	ipClient.println(F("POST /stats/alarm/ HTTP/1.1"));
 	ipClient.println(F("Host: api.my.protospace.ca"));
-	ipClient.println(F("User-Agent: ESP8266"));
+	ipClient.println(F("User-Agent: ESP8266 Alarm Tracker"));
 	ipClient.println(F("Accept: */*"));
 	ipClient.println(F("Content-Type: application/json"));
 	ipClient.print(F("Content-Length: "));
-	ipClient.println(strlen(messagePrefix) + strlen(messageContent) + 25);
-	ipClient.print(F("Access-Token: "));
+	ipClient.println(strlen(messagePrefix) + strlen(messageContent) + 11); // 11 chars for json junk
+	ipClient.print(F("Authorization: Bearer "));
 	ipClient.println(spaceportToken);
 	ipClient.println();
-	ipClient.print(F("{\"body\":\""));
+	ipClient.print(F("{\"data\":\""));
 	ipClient.print(messagePrefix);
 	ipClient.print(messageContent);
-	ipClient.print(F("\",\"type\":\"note\"}"));
+	ipClient.print(F("\"}"));
 
 	// Waits for a response
 	unsigned long previousMillis = millis();
 	while (!ipClient.available()) {
 		dsc.loop();
-		if (millis() - previousMillis > 3000) {
+		if (millis() - previousMillis > 5000) {
 			Serial.println(F("Connection timed out waiting for a response."));
 			ipClient.stop();
 			return false;
