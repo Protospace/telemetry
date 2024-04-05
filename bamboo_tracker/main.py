@@ -1,3 +1,8 @@
+# Script that talks to Bambu P1S printer over mqtt to get status
+# and then sends to Spaceport.
+#
+# Note: ACCESS_CODE may change after firmware updates
+
 import os, logging
 DEBUG = os.environ.get('DEBUG')
 logging.basicConfig(
@@ -54,17 +59,17 @@ async def portal_send():
             except KeyboardInterrupt:
                 break
             except BaseException as e:
-                logging.error('Problem sending printer data to portal %s:', url)
+                logging.error('Problem sending printer data to dev portal %s:', url)
                 logging.exception(e)
 
-            #try:
-            #    url = 'https://api.my.protospace.ca/stats/p1s1/printer3d/'
-            #    await session.post(url, json=printer, timeout=10)
-            #except KeyboardInterrupt:
-            #    break
-            #except BaseException as e:
-            #    logging.error('Problem sending printer data to portal %s:', url)
-            #    logging.exception(e)
+            try:
+                url = 'https://api.my.protospace.ca/stats/p1s1/printer3d/'
+                await session.post(url, json=printer, timeout=10)
+            except KeyboardInterrupt:
+                break
+            except BaseException as e:
+                logging.error('Problem sending printer data to portal %s:', url)
+                logging.exception(e)
 
             logging.debug('Done sending.')
 
