@@ -13,6 +13,7 @@ SENSORS = [
     ('air', 0, 'temp'),
     ('air', 1, 'pm25'),
     ('air', 1, 'temp'),
+    ('sound', 0, 'db'),
 ]
 
 TIMEZONE = pytz.timezone('America/Edmonton')
