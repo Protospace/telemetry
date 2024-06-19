@@ -1,6 +1,6 @@
-# MQTT Bridge
+# Solaredge Bridge
 
-This bridges messages between Protospace's MQTT broker and the member portal Spaceport.
+This bridges solar production data between the Solaredge API and the member portal Spaceport.
 
 Runs on the webhost VPS (protospace.ca).
 
