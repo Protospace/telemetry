@@ -63,8 +63,8 @@ $ sudo supervisorctl reread; sudo supervisorctl update
 You can control it with these commands:
 
 ```
-$ sudo superisorctl status mqttbridge
-$ sudo superisorctl stop mqttbridge
-$ sudo superisorctl start mqttbridge
-$ sudo superisorctl restart mqttbridge
+$ sudo supervisorctl status mqttbridge
+$ sudo supervisorctl stop mqttbridge
+$ sudo supervisorctl start mqttbridge
+$ sudo supervisorctl restart mqttbridge
 ```
