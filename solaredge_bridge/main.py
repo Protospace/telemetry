@@ -33,7 +33,7 @@ async def process_solar_data(user, data):
 
             logging.info('Sent to portal URL: %s', url)
     except BaseException as e:
-        logging.error('Problem sending json to portal %s:', url)
+        logging.error('Problem sending json to portal:')
         logging.exception(e)
 
 async def get_solaredge_data(user):
@@ -48,7 +48,7 @@ async def get_solaredge_data(user):
             logging.info('Got SolarEdge data: %s', data)
             return data
     except BaseException as e:
-        logging.error('Problem getting json from %s:', url)
+        logging.error('Problem getting json from SolarEdge:')
         logging.exception(e)
         return False
 
