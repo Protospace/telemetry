@@ -16,15 +16,13 @@ import secrets
 
 async def process_solar_data(data):
     try:
+
         serial = data.device_serial_number
-        power = int(data.active_power)
+        dtu_power = getattr(data, 'dtu_power', 0)
+        power = dtu_power // 10
         name = secrets.SOLAR_INFO['name']
 
         logging.info('DTU Serial: %s, user: %s, power: %s', serial, name, power)
-
-        if power < 5:
-            logging.info('Forcing power to zero, night time')  # DTU reports 2 W at night??
-            power = 0
 
         async with aiohttp.ClientSession() as session:
             data = dict(user=name, power=power)
@@ -47,7 +45,6 @@ async def get_hoymiles_data():
         response = await dtu.async_get_real_data_new()
 
         if response:
-            logging.info('DTU response: %s', ', '.join(str(response).splitlines()[:4]))
             logging.debug('DTU response: %s', response)
             return response
         else:
