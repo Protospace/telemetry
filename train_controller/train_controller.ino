@@ -4,18 +4,17 @@
 #include <ESP8266WiFi.h>
 #include <ESP8266WebServer.h>
 #include <ElegantOTA.h>         // v2.2.9
-#include "lets_encrypt_ca.h"
 
 #include "secrets.h"
 
-WiFiClientSecure wc;
+WiFiClient wc;
 MqttClient mqttClient(wc);
 ESP8266WebServer server(80);
 
 
-const char broker[] = "webhost.protospace.ca";
-int        port     = 8883;
-const char topic[]  = "train/control";
+const char broker[] = "172.17.17.181";
+int        port     = 1883;
+const char topic[]  = "train/control/speed";
 #define QOS_2 2
 
 void (* resetFunc) (void) = 0;
@@ -55,7 +54,7 @@ void setup() {
 	Serial.println();
 
 	Serial.print("[WIFI] Connected to: ");
-	Serial.println(SECRET_SSID);
+	Serial.print(SECRET_SSID);
 	Serial.print(", IP address: ");
 	Serial.println(WiFi.localIP());
 
@@ -76,17 +75,13 @@ void setup() {
 	Serial.print(asctime(&timeinfo));
 	Serial.println(" UTC");
 
-	wc.setInsecure();  // disables all SSL checks. don't use in production
-
 	server.on("/", []() {
-		server.send(200, "text/plain", "prototrain");
+		server.send(200, "text/html", "<i>SEE YOU STEEL COWBOY...</i>");
 	});
 
 	ElegantOTA.begin(&server);    // Start ElegantOTA
 	server.begin();
 	Serial.println("[HTTP] server started");
-
-	mqttClient.setUsernamePassword(MQTT_USERNAME, MQTT_PASSWORD);
 
 	mqttClient.setId("prototrain");
 
@@ -161,7 +156,7 @@ void onMqttMessage(int messageSize) {
 
 	Serial.println(message);
 
-	if (topic != "train/control") {
+	if (topic != "train/control/speed") {
 		Serial.println("[MQTT] Invalid topic, returning.");
 		return;
 	}
