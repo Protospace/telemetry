@@ -25,7 +25,7 @@ $ . env/bin/activate
 Test running:
 
 ```
-(env) $ python main.py
+(env) $ DEBUG=true python main.py
 ```
 
 Persist with supervisor:
