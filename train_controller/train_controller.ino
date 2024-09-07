@@ -2,12 +2,15 @@
 
 #include <ArduinoMqttClient.h>
 #include <ESP8266WiFi.h>
+#include <ESP8266WebServer.h>
+#include <ElegantOTA.h>         // v2.2.9
 #include "lets_encrypt_ca.h"
 
 #include "secrets.h"
 
 WiFiClientSecure wc;
 MqttClient mqttClient(wc);
+ESP8266WebServer server(80);
 
 
 const char broker[] = "webhost.protospace.ca";
@@ -18,6 +21,11 @@ const char topic[]  = "train/control";
 void (* resetFunc) (void) = 0;
 
 void setup() {
+	pinMode(D1, OUTPUT);
+	pinMode(D2, OUTPUT);
+	digitalWrite(D1, LOW);
+	digitalWrite(D2, LOW);
+
 	Serial.begin(115200);
 	Serial.println("");
 	Serial.println("");
@@ -25,6 +33,7 @@ void setup() {
 
 	static int error_count = 0;
 
+	WiFi.hostname("prototrain1");
 	WiFi.mode(WIFI_STA);
 	WiFi.begin(SECRET_SSID, SECRET_PASS);
 
@@ -45,6 +54,11 @@ void setup() {
 	Serial.println("[WIFI] Connected to the network");
 	Serial.println();
 
+	Serial.print("[WIFI] Connected to: ");
+	Serial.println(SECRET_SSID);
+	Serial.print(", IP address: ");
+	Serial.println(WiFi.localIP());
+
 	// Synchronize time using NTP. This is necessary to verify that
 	// the TLS certificates offered by the server are currently valid.
 	Serial.print("[TIME] Setting time using NTP");
@@ -63,6 +77,14 @@ void setup() {
 	Serial.println(" UTC");
 
 	wc.setInsecure();  // disables all SSL checks. don't use in production
+
+	server.on("/", []() {
+		server.send(200, "text/plain", "prototrain");
+	});
+
+	ElegantOTA.begin(&server);    // Start ElegantOTA
+	server.begin();
+	Serial.println("[HTTP] server started");
 
 	mqttClient.setUsernamePassword(MQTT_USERNAME, MQTT_PASSWORD);
 
@@ -118,11 +140,15 @@ void loop() {
 		Serial.println("Over 10 errors, resetting...");
 		resetFunc();
 	}
+
+	server.handleClient();
+
 }
 
 void onMqttMessage(int messageSize) {
+	String topic = mqttClient.messageTopic();
 	Serial.print("[MQTT] Received a message with topic '");
-	Serial.print(mqttClient.messageTopic());
+	Serial.print(topic);
 	Serial.print("', length ");
 	Serial.print(messageSize);
 	Serial.println(" bytes:");
@@ -135,15 +161,26 @@ void onMqttMessage(int messageSize) {
 
 	Serial.println(message);
 
-	int64_t num = message.toInt();
-	if (num) {
-		processGarageCommand(num);
+	if (topic != "train/control") {
+		Serial.println("[MQTT] Invalid topic, returning.");
+		return;
 	}
+
+	int64_t num = message.toInt();
+	processControlCommand(num);
 }
 
-void processGarageCommand(int64_t num) {
+void processControlCommand(int64_t num) {
 	static int64_t prev_num = 0;
 
-	Serial.print("Setting power: ");
+	Serial.print("[CHOO] Setting power: ");
 	Serial.println(num);
+
+	if (num > 0) {
+		analogWrite(D1, num);
+		analogWrite(D2, 0);
+	} else {
+		analogWrite(D1, 0);
+		analogWrite(D2, -num);
+	}
 }
