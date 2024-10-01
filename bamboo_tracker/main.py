@@ -17,23 +17,35 @@ import aiohttp
 import secrets
 from pybambu import BambuClient
 
-# TODO: support multiple clients
-client = BambuClient(
-    device_type='P1S',
-    serial=secrets.SERIAL,
-    host=secrets.PRINTER_IP,
-    username='bblp',
-    access_code=secrets.ACCESS_CODE,
-)
+clients = {}
+printers = {}
 
-printer = dict(
-    info=dict(),
-    temperature=dict(),
-)
+for PRINTER in secrets.PRINTERS:
+    client = BambuClient(
+        device_type='P1S',
+        serial=PRINTER['serial'],
+        host=PRINTER['printer_ip'],
+        username='bblp',
+        access_code=PRINTER['access_code'],
+    )
+    clients[PRINTER['name']] = client
 
-def event_handler(event):
+    printer = dict(
+        info=dict(),
+        temperature=dict(),
+    )
+    printers[PRINTER['name']] = printer
+
+    logging.info('Added printer %s, ip: %s, serial: %s', PRINTER['name'], PRINTER['printer_ip'], PRINTER['serial'])
+
+
+def event_handler(event, name):
     if 'jpeg_received' in event:
         return
+
+    logging.debug('Received data for printer %s', name)
+
+    printer = printers[name]
 
     for attr in ['print_percentage', 'gcode_state', 'remaining_time', 'current_layer', 'total_layers', 'online']:
         printer['info'][attr] = getattr(client._device.info, attr)
@@ -42,7 +54,9 @@ def event_handler(event):
         printer['temperature'][attr] = getattr(client._device.temperature, attr)
 
 async def listen_printer():
-    await client.connect(callback=event_handler)
+    for name, client in clients.items():
+        await client.connect(callback=lambda event: event_handler(event, name))
+        logging.info('Finished connecting to: %s', name)
 
 async def portal_send():
     async with aiohttp.ClientSession() as session:
@@ -50,28 +64,29 @@ async def portal_send():
             sleep_time = 5 if DEBUG else 60
             await asyncio.sleep(sleep_time)
 
-            logging.info('Sending to portal...')
-            logging.debug('JSON data:\n%s', json.dumps(printer, indent=4))
+            for name, printer in printers.items():
+                logging.info('Sending %s printer data to portal...', name)
+                logging.debug('JSON data:\n%s', json.dumps(printer, indent=4))
 
-            try:
-                url = 'https://api.spaceport.dns.t0.vc/stats/p1s1/printer3d/'
-                await session.post(url, json=printer, timeout=10)
-            except KeyboardInterrupt:
-                break
-            except BaseException as e:
-                logging.error('Problem sending printer data to dev portal %s:', url)
-                logging.exception(e)
+                try:
+                    url = 'https://api.spaceport.dns.t0.vc/stats/{}/printer3d/'.format(name)
+                    await session.post(url, json=printer, timeout=10)
+                except KeyboardInterrupt:
+                    break
+                except BaseException as e:
+                    logging.error('Problem sending printer data to dev portal %s:', url)
+                    logging.exception(e)
 
-            try:
-                url = 'https://api.my.protospace.ca/stats/p1s1/printer3d/'
-                await session.post(url, json=printer, timeout=10)
-            except KeyboardInterrupt:
-                break
-            except BaseException as e:
-                logging.error('Problem sending printer data to portal %s:', url)
-                logging.exception(e)
+                #try:
+                #    url = 'https://api.my.protospace.ca/stats/{}/printer3d/'.format(name)
+                #    await session.post(url, json=printer, timeout=10)
+                #except KeyboardInterrupt:
+                #    break
+                #except BaseException as e:
+                #    logging.error('Problem sending printer data to portal %s:', url)
+                #    logging.exception(e)
 
-            logging.debug('Done sending.')
+                logging.debug('Done sending.')
 
 
 loop = asyncio.get_event_loop()
