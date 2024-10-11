@@ -13,17 +13,24 @@ import time
 import json
 import asyncio
 import aiohttp
+import sys
 
-import secrets
 from pybambu import BambuClient
 
-# TODO: support multiple clients
+if len(sys.argv) != 5:
+    print('Missing arguments. Run like so:')
+    print('python main.py NAME SERIAL PRINTER_IP ACCESS_CODE')
+    print('Example: python main.py p1s1 123412341234123 172.17.18.999 12345679')
+    exit(1)
+
+_, NAME, SERIAL, PRINTER_IP, ACCESS_CODE = sys.argv
+
 client = BambuClient(
     device_type='P1S',
-    serial=secrets.SERIAL,
-    host=secrets.PRINTER_IP,
+    serial=SERIAL,
+    host=PRINTER_IP,
     username='bblp',
-    access_code=secrets.ACCESS_CODE,
+    access_code=ACCESS_CODE,
 )
 
 printer = dict(
@@ -54,7 +61,7 @@ async def portal_send():
             logging.debug('JSON data:\n%s', json.dumps(printer, indent=4))
 
             try:
-                url = 'https://api.spaceport.dns.t0.vc/stats/p1s1/printer3d/'
+                url = 'https://api.spaceport.dns.t0.vc/stats/{}/printer3d/'.format(NAME)
                 await session.post(url, json=printer, timeout=10)
             except KeyboardInterrupt:
                 break
@@ -63,7 +70,7 @@ async def portal_send():
                 logging.exception(e)
 
             try:
-                url = 'https://api.my.protospace.ca/stats/p1s1/printer3d/'
+                url = 'https://api.my.protospace.ca/stats/{}/printer3d/'.format(NAME)
                 await session.post(url, json=printer, timeout=10)
             except KeyboardInterrupt:
                 break
