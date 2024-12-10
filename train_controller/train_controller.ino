@@ -4,14 +4,14 @@
 #include <ESP8266WiFi.h>
 #include <ESP8266WebServer.h>
 #include <ElegantOTA.h>         // v2.2.9
-
+#include <Servo.h>
 #include "secrets.h"
 
 WiFiClient wc;
 MqttClient mqttClient(wc);
 ESP8266WebServer server(80);
 
-
+Servo esc;
 const char broker[] = "172.17.17.181";
 int        port     = 1883;
 const char topic[]  = "train/control/speed";
@@ -20,10 +20,7 @@ const char topic[]  = "train/control/speed";
 void (* resetFunc) (void) = 0;
 
 void setup() {
-	pinMode(D1, OUTPUT);
-	pinMode(D2, OUTPUT);
-	digitalWrite(D1, LOW);
-	digitalWrite(D2, LOW);
+	esc.attach(D1);
 
 	Serial.begin(115200);
 	Serial.println("");
@@ -170,12 +167,5 @@ void processControlCommand(int64_t num) {
 
 	Serial.print("[CHOO] Setting power: ");
 	Serial.println(num);
-
-	if (num > 0) {
-		analogWrite(D1, num);
-		analogWrite(D2, 0);
-	} else {
-		analogWrite(D1, 0);
-		analogWrite(D2, -num);
-	}
+	esc.write(num);
 }
