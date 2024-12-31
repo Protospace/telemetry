@@ -119,8 +119,9 @@ dscClassicInterface dsc(dscClockPin, dscReadPin, dscPC16Pin);
 #endif
 X509List spaceportCert(spaceportCertificateRoot);
 WiFiClientSecure ipClient;
-bool wifiConnected = true;
+bool wifiConnected = false;
 
+void (* resetFunc) (void) = 0;
 
 void setup() {
 	Serial.begin(115200);
@@ -163,10 +164,11 @@ void setup() {
 
 
 void loop() {
+	static int error_count = 0;
 
 	// Updates status if WiFi drops and reconnects
 	if (!wifiConnected && WiFi.status() == WL_CONNECTED) {
-		Serial.println("WiFi reconnected");
+		Serial.println("WiFi Connected");
 		wifiConnected = true;
 		dsc.pauseStatus = false;
 		dsc.statusChanged = true;
@@ -175,6 +177,20 @@ void loop() {
 		Serial.println("WiFi disconnected");
 		wifiConnected = false;
 		dsc.pauseStatus = true;
+	}
+
+	if (WiFi.status() != WL_CONNECTED) {
+		error_count += 1;
+		Serial.println("[WIFI] Lost connection. Reconnecting...");
+		WiFi.begin(wifiSSID, wifiPassword);
+		delay(5000);
+	} else {
+		error_count = 0;
+	}
+
+	if (error_count > 10) {
+		Serial.println("Over 10 errors, resetting...");
+		resetFunc();
 	}
 
 	dsc.loop();
