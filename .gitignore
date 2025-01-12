@@ -166,3 +166,4 @@ data/
 secrets.h
 secrets.py
 *.bin
+*.jpg

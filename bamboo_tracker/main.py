@@ -14,65 +14,85 @@ import time
 import json
 import asyncio
 import aiohttp
+import aiofiles
 from aiohttp import web
 import sys
 
+import secrets
+
 app = web.Application()
 
-from pybambu import BambuClient
 
-if len(sys.argv) != 6:
+if len(sys.argv) != 4:
     print('Missing arguments. Run like so:')
-    print('python main.py NAME SERIAL PRINTER_IP ACCESS_CODE LISTEN_PORT')
-    print('Example: python main.py p1s1 123412341234123 172.17.18.999 12345679 8080')
+    print('python main.py NAME SERIAL LISTEN_PORT')
+    print('Example: python main.py p1s1 01P09C471500459 8080')
     exit(1)
 
-_, NAME, SERIAL, PRINTER_IP, ACCESS_CODE, LISTEN_PORT = sys.argv
-
-client = BambuClient(
-    device_type='P1S',
-    serial=SERIAL,
-    host=PRINTER_IP,
-    username='bblp',
-    access_code=ACCESS_CODE,
-)
+_, NAME, SERIAL, LISTEN_PORT = sys.argv
+SERIAL = SERIAL.lower()
 
 printer = dict(
     info=dict(),
     temperature=dict(),
 )
 
-
-def event_handler(event):
-    if 'jpeg_received' in event:
-        return
-
-    for attr in ['print_percentage', 'gcode_state', 'remaining_time', 'current_layer', 'total_layers', 'online']:
-        printer['info'][attr] = getattr(client._device.info, attr)
-
-    for attr in ['bed_temp', 'target_bed_temp', 'nozzle_temp', 'target_nozzle_temp']:
-        printer['temperature'][attr] = getattr(client._device.temperature, attr)
-
-async def listen_printer():
-    await client.connect(callback=event_handler)
-
-async def portal_send():
+async def printer_status():
     async with aiohttp.ClientSession() as session:
         while True:
             sleep_time = 5 if DEBUG else 60
             await asyncio.sleep(sleep_time)
 
-            logging.info('Sending to portal...')
-            logging.debug('JSON data:\n%s', json.dumps(printer, indent=4))
-
             try:
-                url = 'https://api.spaceport.dns.t0.vc/stats/{}/printer3d/'.format(NAME)
-                await session.post(url, json=printer, timeout=10)
+                headers = {'Authorization': 'Bearer ' + secrets.HOMEASSISTANT_TOKEN}
+                url = secrets.HOMEASSISTANT_URL + '/api/states'
+                res = await session.get(url, headers=headers, timeout=10)
+                res.raise_for_status()
+                res = await res.json()
             except KeyboardInterrupt:
                 break
             except BaseException as e:
-                logging.error('Problem sending printer data to dev portal %s:', url)
+                printer['info']['online'] = False
+                logging.error('Problem getting status from Home Assistant URL %s:', url)
                 logging.exception(e)
+            
+            entities = [
+                f'sensor.p1s_{SERIAL}_print_status',
+                f'sensor.p1s_{SERIAL}_print_progress',
+                f'sensor.p1s_{SERIAL}_current_layer',
+                f'sensor.p1s_{SERIAL}_total_layer_count',
+                f'sensor.p1s_{SERIAL}_remaining_time',
+                f'sensor.p1s_{SERIAL}_bed_temperature',
+                f'sensor.p1s_{SERIAL}_bed_target_temperature',
+                f'sensor.p1s_{SERIAL}_nozzle_temperature',
+                f'sensor.p1s_{SERIAL}_nozzle_target_temperature',
+            ]
+            status = {}
+
+            for entry in res:
+                if entry['entity_id'] in entities:
+                    status[entry['entity_id'].split('_',2)[2]] = entry['state']
+
+            logging.debug('Status data:\n%s', json.dumps(status, indent=4))
+
+            if not status:
+                raise Exception('Status empty, do you have the correct serial number?')
+
+            # massage data into old integration format
+            printer['info']['online'] = True
+            printer['info']['gcode_state'] = status['print_status'].upper()
+            printer['info']['current_layer'] = status['current_layer']
+            printer['info']['total_layers'] = status['total_layer_count']
+            printer['info']['print_percentage'] = status['print_progress']
+            printer['info']['remaining_time'] = status['remaining_time']
+
+            printer['temperature']['bed_temp'] = status['bed_temperature']
+            printer['temperature']['target_bed_temp'] = status['bed_target_temperature']
+            printer['temperature']['nozzle_temp'] = status['nozzle_temperature']
+            printer['temperature']['target_nozzle_temp'] = status['nozzle_target_temperature']
+
+            logging.info('Sending to portal...')
+            logging.debug('JSON data:\n%s', json.dumps(printer, indent=4))
 
             try:
                 url = 'https://api.my.protospace.ca/stats/{}/printer3d/'.format(NAME)
@@ -83,18 +103,50 @@ async def portal_send():
                 logging.error('Problem sending printer data to portal %s:', url)
                 logging.exception(e)
 
+            try:
+                url = 'https://api.spaceport.dns.t0.vc/stats/{}/printer3d/'.format(NAME)
+                await session.post(url, json=printer, timeout=10)
+            except KeyboardInterrupt:
+                break
+            except BaseException as e:
+                logging.info('Problem sending printer data to dev portal %s:', url)
+
             logging.debug('Done sending.')
+
+
+
+async def printer_camera():
+    async with aiohttp.ClientSession() as session:
+        while True:
+            sleep_time = 1
+            await asyncio.sleep(sleep_time)
+
+            try:
+                headers = {'Authorization': 'Bearer ' + secrets.HOMEASSISTANT_TOKEN}
+                url = secrets.HOMEASSISTANT_URL + f'/api/camera_proxy/camera.p1s_{SERIAL}_camera'
+                res = await session.get(url, headers=headers, timeout=10)
+                res.raise_for_status()
+
+                f = await aiofiles.open(NAME + '/pic.jpg', mode='wb')
+                try:
+                    await f.write(await res.read())
+                finally:
+                    await f.close()
+
+                logging.debug('Saved snapshot.')
+            except KeyboardInterrupt:
+                break
+            except BaseException as e:
+                logging.error('Problem getting camera frame from Home Assistant URL %s:', url)
+                logging.exception(e)
+
 
 async def index(request):
     return web.Response(text='bambu bridge', content_type='text/html')
 
-async def pic(request):
-    return web.Response(body=client._device.p1p_camera.get_jpeg(), content_type='image/jpeg')
-
-
 async def main():
     app.router.add_get('/', index)
-    app.router.add_get('/' + NAME + '/pic', pic)
+    app.add_routes([web.static('/' + NAME, NAME)])
 
     runner = web.AppRunner(app)
     await runner.setup()
@@ -102,8 +154,8 @@ async def main():
     await site.start()
 
 loop = asyncio.get_event_loop()
-loop.create_task(listen_printer())
-loop.create_task(portal_send())
+loop.create_task(printer_status())
+loop.create_task(printer_camera())
 loop.create_task(main())
 loop.run_forever()
 
