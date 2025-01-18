@@ -38,92 +38,95 @@ printer = dict(
 )
 
 async def printer_status():
-    async with aiohttp.ClientSession() as session:
-        while True:
-            sleep_time = 5 if DEBUG else 60
-            await asyncio.sleep(sleep_time)
+    while True:
+        sleep_time = 5 if DEBUG else 60
+        await asyncio.sleep(sleep_time)
 
-            try:
-                headers = {'Authorization': 'Bearer ' + secrets.HOMEASSISTANT_TOKEN}
-                url = secrets.HOMEASSISTANT_URL + '/api/states'
+        try:
+            headers = {'Authorization': 'Bearer ' + secrets.HOMEASSISTANT_TOKEN}
+            url = secrets.HOMEASSISTANT_URL + '/api/states'
+            async with aiohttp.ClientSession() as session:
                 res = await session.get(url, headers=headers, timeout=10)
                 res.raise_for_status()
                 res = await res.json()
-            except KeyboardInterrupt:
-                break
-            except BaseException as e:
-                printer['info']['online'] = False
-                logging.error('Problem getting status from Home Assistant URL %s:', url)
-                logging.exception(e)
-            
-            entities = [
-                f'sensor.p1s_{SERIAL}_print_status',
-                f'sensor.p1s_{SERIAL}_print_progress',
-                f'sensor.p1s_{SERIAL}_current_layer',
-                f'sensor.p1s_{SERIAL}_total_layer_count',
-                f'sensor.p1s_{SERIAL}_remaining_time',
-                f'sensor.p1s_{SERIAL}_bed_temperature',
-                f'sensor.p1s_{SERIAL}_bed_target_temperature',
-                f'sensor.p1s_{SERIAL}_nozzle_temperature',
-                f'sensor.p1s_{SERIAL}_nozzle_target_temperature',
-            ]
-            status = {}
+        except KeyboardInterrupt:
+            break
+        except BaseException as e:
+            printer['info']['online'] = False
+            logging.error('Problem getting status from Home Assistant URL %s:', url)
+            logging.exception(e)
 
-            for entry in res:
-                if entry['entity_id'] in entities:
-                    status[entry['entity_id'].split('_',2)[2]] = entry['state']
+        entities = [
+            f'sensor.p1s_{SERIAL}_print_status',
+            f'sensor.p1s_{SERIAL}_print_progress',
+            f'sensor.p1s_{SERIAL}_current_layer',
+            f'sensor.p1s_{SERIAL}_total_layer_count',
+            f'sensor.p1s_{SERIAL}_remaining_time',
+            f'sensor.p1s_{SERIAL}_bed_temperature',
+            f'sensor.p1s_{SERIAL}_bed_target_temperature',
+            f'sensor.p1s_{SERIAL}_nozzle_temperature',
+            f'sensor.p1s_{SERIAL}_nozzle_target_temperature',
+        ]
+        status = {}
 
-            logging.debug('Status data:\n%s', json.dumps(status, indent=4))
+        for entry in res:
+            if entry['entity_id'] in entities:
+                status[entry['entity_id'].split('_',2)[2]] = entry['state']
 
-            if not status:
-                raise Exception('Status empty, do you have the correct serial number?')
+        logging.debug('Status data:\n%s', json.dumps(status, indent=4))
 
-            # massage data into old integration format
-            printer['info']['online'] = True
-            printer['info']['gcode_state'] = status['print_status'].upper()
-            printer['info']['current_layer'] = status['current_layer']
-            printer['info']['total_layers'] = status['total_layer_count']
-            printer['info']['print_percentage'] = status['print_progress']
-            printer['info']['remaining_time'] = status['remaining_time']
+        if not status:
+            raise Exception('Status empty, do you have the correct serial number?')
 
-            printer['temperature']['bed_temp'] = status['bed_temperature']
-            printer['temperature']['target_bed_temp'] = status['bed_target_temperature']
-            printer['temperature']['nozzle_temp'] = status['nozzle_temperature']
-            printer['temperature']['target_nozzle_temp'] = status['nozzle_target_temperature']
+        # massage data into old integration format
+        printer['info']['online'] = True
+        printer['info']['gcode_state'] = status['print_status'].upper()
+        printer['info']['current_layer'] = status['current_layer']
+        printer['info']['total_layers'] = status['total_layer_count']
+        printer['info']['print_percentage'] = status['print_progress']
+        printer['info']['remaining_time'] = status['remaining_time']
 
-            logging.info('Sending to portal...')
-            logging.debug('JSON data:\n%s', json.dumps(printer, indent=4))
+        printer['temperature']['bed_temp'] = status['bed_temperature']
+        printer['temperature']['target_bed_temp'] = status['bed_target_temperature']
+        printer['temperature']['nozzle_temp'] = status['nozzle_temperature']
+        printer['temperature']['target_nozzle_temp'] = status['nozzle_target_temperature']
 
-            try:
-                url = 'https://api.my.protospace.ca/stats/{}/printer3d/'.format(NAME)
+        logging.info('Sending to portal...')
+        logging.debug('JSON data:\n%s', json.dumps(printer, indent=4))
+
+        try:
+            url = 'https://api.my.protospace.ca/stats/{}/printer3d/'.format(NAME)
+            async with aiohttp.ClientSession() as session:
                 await session.post(url, json=printer, timeout=10)
-            except KeyboardInterrupt:
-                break
-            except BaseException as e:
-                logging.error('Problem sending printer data to portal %s:', url)
-                logging.exception(e)
+        except KeyboardInterrupt:
+            break
+        except BaseException as e:
+            logging.error('Problem sending printer data to portal %s:', url)
+            logging.exception(e)
 
-            try:
-                url = 'https://api.spaceport.dns.t0.vc/stats/{}/printer3d/'.format(NAME)
+        try:
+            url = 'https://api.spaceport.dns.t0.vc/stats/{}/printer3d/'.format(NAME)
+            async with aiohttp.ClientSession() as session:
                 await session.post(url, json=printer, timeout=10)
-            except KeyboardInterrupt:
-                break
-            except BaseException as e:
-                logging.info('Problem sending printer data to dev portal %s:', url)
+        except KeyboardInterrupt:
+            break
+        except BaseException as e:
+            logging.info('Problem sending printer data to dev portal %s:', url)
 
-            logging.debug('Done sending.')
+        logging.debug('Done sending.')
 
 
 
 async def printer_camera():
-    async with aiohttp.ClientSession() as session:
-        while True:
-            sleep_time = 1
-            await asyncio.sleep(sleep_time)
+    while True:
+        await asyncio.sleep(1)
 
-            try:
-                headers = {'Authorization': 'Bearer ' + secrets.HOMEASSISTANT_TOKEN}
-                url = secrets.HOMEASSISTANT_URL + f'/api/camera_proxy/camera.p1s_{SERIAL}_camera'
+        try:
+            logging.debug('Getting camera frame...')
+
+            headers = {'Authorization': 'Bearer ' + secrets.HOMEASSISTANT_TOKEN}
+            url = secrets.HOMEASSISTANT_URL + f'/api/camera_proxy/camera.p1s_{SERIAL}_camera'
+            async with aiohttp.ClientSession() as session:
                 res = await session.get(url, headers=headers, timeout=10)
                 res.raise_for_status()
 
@@ -133,12 +136,12 @@ async def printer_camera():
                 finally:
                     await f.close()
 
-                logging.debug('Saved snapshot.')
-            except KeyboardInterrupt:
-                break
-            except BaseException as e:
-                logging.error('Problem getting camera frame from Home Assistant URL %s:', url)
-                logging.exception(e)
+            logging.debug('Saved snapshot.')
+        except KeyboardInterrupt:
+            break
+        except BaseException as e:
+            logging.error('Problem getting camera frame from Home Assistant URL %s:', url)
+            logging.exception(e)
 
 
 async def index(request):
@@ -153,9 +156,17 @@ async def main():
     site = web.TCPSite(runner, '0.0.0.0', LISTEN_PORT)
     await site.start()
 
+def task_died(future):
+    if os.environ.get('SHELL'):
+        logging.error('Bambu tracker task died!')
+    else:
+        logging.error('Bambu tracker task died! Waiting 60s and exiting...')
+        time.sleep(60)
+    exit()
+
 loop = asyncio.get_event_loop()
-loop.create_task(printer_status())
-loop.create_task(printer_camera())
+loop.create_task(printer_status()).add_done_callback(task_died)
+loop.create_task(printer_camera()).add_done_callback(task_died)
 loop.create_task(main())
 loop.run_forever()
 
