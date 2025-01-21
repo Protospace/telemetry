@@ -1,44 +1,36 @@
 // Protospace Air Quality sensor V2
 // Board: Adafruit QT Py ESP32-S2
 
-#include <Arduino.h>
-#include <ArduinoJson.h>
-#include <ArduinoMqttClient.h>
 #include <WiFi.h>
-#include <WiFiClientSecure.h>
+#include <ArduinoJson.h>  // v6.21.4
+#include <ArduinoMqttClient.h>  // v0.1.6
 #include "Adafruit_PM25AQI.h"
 #include "Adafruit_SGP30.h"
 #include "secrets.h"
-#include "lets_encrypt_ca.h"
 
-#define SAMPLE_TIME     60 // seconds
-#define SENDING_DURATION_MS 60*1000
-#define MAX_FAILS       5
+#define MAX_FAILS       10
+#define SENDING_DURATION_MS 10*1000
 
-WiFiClientSecure wc;
-MqttClient mqttClient(wc);
+WiFiClient wifiClient;
+MqttClient mqttClient(wifiClient);
 
-Adafruit_PM25AQI aqi = Adafruit_PM25AQI();
+Adafruit_SGP30 sgp;  // Gas sensor
 
-Adafruit_SGP30 sgp;
+Adafruit_PM25AQI aqi = Adafruit_PM25AQI();  // PM sensor
 
-void (* resetFunc) (void) = 0;
+const char broker[] = "172.17.17.181";
+int        port     = 1883;
 
-const char broker[] = "webhost.protospace.ca";
-int        port     = 8883;
-
-#define DATA_TOPIC   "test/air/4/data"
-#define LOG_TOPIC    "test/air/4/log"
-#define MQTT_ID      "air4"
-
-long failCount = 0;
 int initial_ignored_count = 0;
 
 void sendMqtt(String topic, String msg) {
 	Serial.println(msg);
-	mqttClient.beginMessage(topic);
-	mqttClient.print(msg);
-	mqttClient.endMessage();
+
+	if (mqttClient.connected()) {
+		mqttClient.beginMessage(topic);
+		mqttClient.print(msg);
+		mqttClient.endMessage();
+	}
 }
 
 // from https://arduinojson.org/v6/how-to/configure-the-serialization-of-floats
@@ -47,9 +39,9 @@ double round2(double value) {
 }
 
 void setup() {
+	int status;
+
 	Serial.begin(115200);
-	delay(1000);
-	//Serial.setDebugOutput(true);
 
 	Serial.println();
 	Serial.println();
@@ -59,48 +51,29 @@ void setup() {
 	delay(1000);
 
 	WiFi.mode(WIFI_STA);
-	WiFi.begin(WIFI_SSID, WIFI_PASS);
+	WiFi.begin(SECRET_SSID, SECRET_PASS);
 	Serial.print("[WIFI] Connecting...");
 	while (WiFi.status() != WL_CONNECTED) {
 		delay(500);
 		Serial.print(".");
 	}
-	Serial.println();
+	Serial.println("");
 	Serial.println("[WIFI] Connected.");
-
-	// Synchronize time using NTP. This is necessary to verify that
-	// the TLS certificates offered by the server are currently valid.
-	Serial.print("[TIME] Setting time using NTP");
-	configTime(8 * 3600, 0, "pool.ntp.org", "time.nist.gov");
-	time_t now = time(nullptr);
-	while (now < 8 * 3600 * 2) {
-		delay(500);
-		Serial.print(".");
-		now = time(nullptr);
-	}
-	Serial.println();
-	struct tm timeinfo;
-	gmtime_r(&now, &timeinfo);
-	Serial.print("[TIME] Current time: ");
-	Serial.print(asctime(&timeinfo));
-	Serial.println(" UTC");
-
-	//X509List cert(lets_encrypt_ca);
-	//wc.setTrustAnchors(&cert);
-	wc.setInsecure();  // disables all SSL checks. don't use in production
-
-	mqttClient.setUsernamePassword(MQTT_USERNAME, MQTT_PASSWORD);
+	delay(500);
 
 	Serial.println("[MQTT] Connecting to broker...");
+
+	mqttClient.setId(MQTT_ID);
 
 	if (!mqttClient.connect(broker, port)) {
 		Serial.print("[MQTT] Connection failed! Error code = ");
 		Serial.println(mqttClient.connectError());
-		Serial.println("[MQTT] Resetting Arduino...");
-		resetFunc();
+		Serial.println("Resetting Arduino...");
+		abort();
 	}
 
 	sendMqtt(LOG_TOPIC, "[META] Boot up");
+	delay(500);
 
 	// QT Py ESP32-S2 has two I2C ports, switch to the header
 	Wire.setPins(SDA1, SCL1);
@@ -109,30 +82,28 @@ void setup() {
 		sendMqtt(LOG_TOPIC, "[META] Started particle sensor");
 	} else {
 		sendMqtt(LOG_TOPIC, "[META] Error starting particle sensor");
-		resetFunc();
+		delay(500);
+		abort();
 	}
 	delay(1000);
 
-	if (sgp.begin()){
+	if (sgp.begin() == 1){
 		sendMqtt(LOG_TOPIC, "[META] Started VOC sensor");
 	} else {
 		sendMqtt(LOG_TOPIC, "[META] Error starting VOC sensor");
-		resetFunc();
+		delay(500);
+		abort();
 	}
 	delay(1000);
 
-	if (sgp.serialnumber[2] == 0x2D3E) {
-		sgp.setIAQBaseline(0x8EAA, 0x8DB5);
-		Serial.println("[META] Set baseline to: 0x8EAA 0x8DB5");
-	}
-	delay(1000);
+	sendMqtt(LOG_TOPIC, "[META] Ready");
 }
 
 int sendSample(String data) {
 	if (WiFi.status() != WL_CONNECTED) {
 		Serial.println("[WIFI] Not connected");
 		Serial.println("[WIFI] Reconnecting...");
-		WiFi.begin(WIFI_SSID, WIFI_PASS);
+		WiFi.begin(SECRET_SSID, SECRET_PASS);
 		return 0;
 	}
 
@@ -146,8 +117,8 @@ int sendSample(String data) {
 		return 0;
 	}
 
-	if (initial_ignored_count < 2) {
-		sendMqtt(LOG_TOPIC, "[DATA] Ignoring first 2 samples");
+	if (initial_ignored_count < 10) {
+		sendMqtt(LOG_TOPIC, "[DATA] Ignoring first 10 samples");
 		initial_ignored_count++;
 		return 1;
 	}
@@ -159,9 +130,12 @@ int sendSample(String data) {
 	return 1;
 }
 
-
 void loop() {
-	static int num_fails = 0;
+	bool read_failed = false;
+	bool send_failed = false;
+	static int num_read_fails = 0;
+	static int num_send_fails = 0;
+
 	static unsigned long prev_sent_time = millis();
 
 	static int num_dust_samples = 0;
@@ -184,10 +158,16 @@ void loop() {
 
 	mqttClient.poll();
 
+
 	//  ============= Dust Sensor ==============
 
 	PM25_AQI_Data pm_data;
 	if (aqi.read(&pm_data)) {
+		Serial.print("[DATA] PM2.5: ");
+		Serial.print(pm_data.pm25_standard);
+		Serial.print(", PM10: ");
+		Serial.println(pm_data.pm10_standard);
+
 		total_p01_std += pm_data.pm10_standard;
 		total_p25_std += pm_data.pm25_standard;
 		total_p10_std += pm_data.pm100_standard;
@@ -202,16 +182,26 @@ void loop() {
 		total_100um += pm_data.particles_100um;
 
 		num_dust_samples++;
+	} else {
+		Serial.println("No PM sensor reading.");
+		read_failed = true;
 	}
-
 
 	//  ============= VOC Sensor ===============
 
+	// TODO: add a temperature / humidity sensor and correct for it
 	if (sgp.IAQmeasure()) {
+		Serial.print("[DATA] TVOC: ");
+		Serial.print(sgp.TVOC);
+		Serial.print(", eCO2: ");
+		Serial.println(sgp.eCO2);
+
 		total_tvoc += sgp.TVOC;
 		total_eco2 += sgp.eCO2;
-
 		num_voc_samples++;
+	} else {
+		Serial.println("No VOC sensor reading.");
+		read_failed = true;
 	}
 
 
@@ -257,7 +247,7 @@ void loop() {
 		total_050um = 0;
 		total_100um = 0;
 
-		// voc
+		// VOC
 		root["tvoc"] = round2(total_tvoc / num_voc_samples);
 		root["eco2"] = round2(total_eco2 / num_voc_samples);
 		num_voc_samples = 0;
@@ -268,18 +258,36 @@ void loop() {
 		serializeJson(root, data);
 
 		if (sendSample(data) == 1) {
-			num_fails = 0;
-			sendMqtt(LOG_TOPIC, "[MQTT] Good send, reset fail count.");
+			sendMqtt(LOG_TOPIC, "[MQTT] Good send.");
 		} else {
-			num_fails++;
-			sendMqtt(LOG_TOPIC, "[MQTT] Bad send, increased fail count.");
+			sendMqtt(LOG_TOPIC, "[MQTT] Bad send.");
+			send_failed = true;
+		}
+
+		if (num_send_fails >= MAX_FAILS) {
+			sendMqtt(LOG_TOPIC, "[META] Too many send failures, resetting...");
+			delay(500);
+			abort();
 		}
 	}
 
-	if (num_fails >= MAX_FAILS) {
-		sendMqtt(LOG_TOPIC, "[MQTT] Too many failures, resetting...");
-		resetFunc();
+	if (read_failed) {
+		num_read_fails++;
+	} else {
+		num_read_fails = 0;
 	}
 
-	delay(200);
+	if (send_failed) {
+		num_send_fails++;
+	} else {
+		num_send_fails = 0;
+	}
+
+	if (num_read_fails >= MAX_FAILS) {
+		sendMqtt(LOG_TOPIC, "[META] Too many read failures, resetting...");
+		delay(500);
+		abort();
+	}
+
+	delay(450);
 }
