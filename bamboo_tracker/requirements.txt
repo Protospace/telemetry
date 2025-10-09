@@ -4,5 +4,4 @@ attrs==23.1.0
 frozenlist==1.4.0
 idna==3.6
 multidict==6.0.4
-paho-mqtt==1.6.1
 yarl==1.9.3

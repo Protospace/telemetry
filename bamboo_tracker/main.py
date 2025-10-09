@@ -1,7 +1,5 @@
-# Script that talks to Bambu P1S printer over mqtt to get status
+# Script that gets Bambu P1S printer status from Home Assistant
 # and then sends to Spaceport.
-#
-# Note: ACCESS_CODE may change after firmware updates
 
 import os, logging
 DEBUG = os.environ.get('DEBUG')
