@@ -8,13 +8,21 @@ logging.basicConfig(
         level=logging.DEBUG if DEBUG else logging.INFO)
 logging.getLogger('aiohttp').setLevel(logging.DEBUG if DEBUG else logging.WARNING)
 
+logging.info('Boot up...')
+
 import time
 import json
 import asyncio
 import aiohttp
 import sys
+import ssl
 
 import secrets
+
+
+sslcontext = ssl.create_default_context()
+sslcontext.check_hostname = False
+sslcontext.verify_mode = ssl.CERT_NONE
 
 
 if len(sys.argv) != 2:
@@ -38,7 +46,7 @@ async def printer_status():
             headers = {'Authorization': 'Bearer ' + secrets.HOMEASSISTANT_TOKEN}
             url = secrets.HOMEASSISTANT_URL + '/api/states'
             async with aiohttp.ClientSession() as session:
-                res = await session.get(url, headers=headers, timeout=10)
+                res = await session.get(url, headers=headers, timeout=10, ssl=sslcontext)
                 res.raise_for_status()
                 res = await res.json()
         except KeyboardInterrupt:
@@ -97,9 +105,9 @@ async def printer_status():
 
 def task_died(future):
     if os.environ.get('SHELL'):
-        logging.error('Bambu tracker task died!')
+        logging.error('Prusa tracker task died!')
     else:
-        logging.error('Bambu tracker task died! Waiting 60s and exiting...')
+        logging.error('Prusa tracker task died! Waiting 60s and exiting...')
         time.sleep(60)
     exit()
 

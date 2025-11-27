@@ -8,6 +8,8 @@ logging.basicConfig(
         level=logging.DEBUG if DEBUG else logging.INFO)
 logging.getLogger('aiohttp').setLevel(logging.DEBUG if DEBUG else logging.WARNING)
 
+logging.info('Boot up...')
+
 import time
 import json
 import asyncio
@@ -15,11 +17,15 @@ import aiohttp
 import aiofiles
 from aiohttp import web
 import sys
+import ssl
 
 import secrets
 
 app = web.Application()
 
+sslcontext = ssl.create_default_context()
+sslcontext.check_hostname = False
+sslcontext.verify_mode = ssl.CERT_NONE
 
 if len(sys.argv) != 4:
     print('Missing arguments. Run like so:')
@@ -44,7 +50,7 @@ async def printer_status():
             headers = {'Authorization': 'Bearer ' + secrets.HOMEASSISTANT_TOKEN}
             url = secrets.HOMEASSISTANT_URL + '/api/states'
             async with aiohttp.ClientSession() as session:
-                res = await session.get(url, headers=headers, timeout=10)
+                res = await session.get(url, headers=headers, timeout=10, ssl=sslcontext)
                 res.raise_for_status()
                 res = await res.json()
         except KeyboardInterrupt:
@@ -125,7 +131,7 @@ async def printer_camera():
             headers = {'Authorization': 'Bearer ' + secrets.HOMEASSISTANT_TOKEN}
             url = secrets.HOMEASSISTANT_URL + f'/api/camera_proxy/camera.p1s_{SERIAL}_camera'
             async with aiohttp.ClientSession() as session:
-                res = await session.get(url, headers=headers, timeout=10)
+                res = await session.get(url, headers=headers, timeout=10, ssl=sslcontext)
                 res.raise_for_status()
 
                 f = await aiofiles.open(NAME + '/pic.jpg', mode='wb')
