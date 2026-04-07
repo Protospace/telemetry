@@ -167,3 +167,4 @@ secrets.h
 secrets.py
 *.bin
 *.jpg
+.aider*
