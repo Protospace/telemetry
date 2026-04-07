@@ -20,13 +20,23 @@ import secrets
 
 async def process_solar_aps(topic, text):
     topic_parts = topic.split('/')
+    power = None
 
-    if topic_parts[2] != 'power':
-        logging.debug('Invalid aps topic, returning')
+    if len(topic_parts) == 3 and topic_parts[2] == 'power':
+        power = text
+    elif len(topic_parts) == 2:
+        try:
+            data = json.loads(text)
+            if 'current_power' in data:
+                power = data['current_power']
+        except json.JSONDecodeError:
+            pass
+
+    if power is None:
+        logging.debug('Not a power message for topic %s, returning', topic)
         return
 
     ecu_id = topic_parts[1]
-    power = text
     try:
         solar_user = secrets.SOLAR_USERS[ecu_id]
     except KeyError:
